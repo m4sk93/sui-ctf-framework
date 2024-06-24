@@ -160,10 +160,24 @@ pub async fn publish_compiled_module(
         gas_price: None
     };
 
+    /*
     let (output, modules) = adapter
         .publish_modules(modules, gas_budget, extra)
         .await
         .unwrap();
+    */
+
+    let (output, modules) = match adapter
+        .publish_modules(modules, gas_budget, extra)
+        .await{
+            Ok(i) => i,
+            Err(e) => {
+                let _ = adapter.cleanup_resources().await;
+                println!("[SERVER] error: {e}");
+                return Err("error during publish_compiled_module".into())
+            }
+        };
+
 
     let published_address = modules.first().unwrap().module.address_identifiers[0];
 
