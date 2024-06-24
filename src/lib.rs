@@ -151,7 +151,8 @@ pub async fn publish_compiled_module(
     modules: Vec<MaybeNamedCompiledModule>, 
     module_dependencies: Vec<String>, 
     sender: Option<String>
-) -> AccountAddress {
+//) -> AccountAddress {
+) -> Result<AccountAddress,Box<dyn error::Error>> {
     let gas_budget: Option<u64> = None;
     let extra: SuiPublishArgs = SuiPublishArgs { 
         sender: sender, 
@@ -191,7 +192,7 @@ pub async fn publish_compiled_module(
     );
     println!("[*] Output: {:#?} \n", output.unwrap());
 
-    published_address
+    Ok(published_address)
 }
 
 pub async fn call_function(
