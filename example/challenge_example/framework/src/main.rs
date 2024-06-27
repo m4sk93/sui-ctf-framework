@@ -9,7 +9,8 @@ use std::str::FromStr;
 
 use tokio;
 
-use move_transactional_test_runner::framework::{MaybeNamedCompiledModule};
+//use move_transactional_test_runner::framework::{MaybeNamedCompiledModule};
+use move_transactional_test_runner::framework::{MaybeNamedCompiledModule, MoveTestAdapter};//// adapter.cleanup_resources()
 use move_bytecode_source_map::{source_map::SourceMap, utils::source_map_from_file};
 use move_binary_format::file_format::CompiledModule;
 use move_symbol_pool::Symbol;
@@ -91,7 +92,7 @@ async fn handle_client(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
         mncp_modules,
         chall_dependencies,
         Some(String::from("challenger")),
-    ).await;
+    ).await.unwrap();
     deployed_modules.push(chall_addr);
     println!("[SERVER] Module published at: {:?}", chall_addr); 
 
@@ -131,7 +132,7 @@ async fn handle_client(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
         mncp_solution,
         sol_dependencies,
         Some(String::from("solver")),
-    ).await;
+    ).await.unwrap();
     println!("[SERVER] Solution published at: {:?}", sol_addr);
 
     // Send Solution Address
@@ -257,7 +258,7 @@ async fn handle_client(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
             stream.write("[SERVER] Invalid Solution!".as_bytes()).unwrap();
         }
     };
-
+    adapter.cleanup_resources().await; ///// cleanup,every time
     Ok(())
 }
 
@@ -276,8 +277,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 println!("[SERVER] New connection: {}", stream.peer_addr()?);
                     let result = local.run_until( async move {
                         tokio::task::spawn_local( async {
-                            handle_client(stream).await.unwrap();
-                        }).await.unwrap();
+                            //handle_client(stream).await.unwrap();
+                            handle_client(stream).await;////fix Panic
+                        //}).await.unwrap();
+                        }).await////fix Panic
                     }).await;
                     println!("[SERVER] Result: {:?}", result);
             }
