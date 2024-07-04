@@ -15,8 +15,8 @@ use move_bytecode_source_map::{source_map::SourceMap, utils::source_map_from_fil
 use move_binary_format::file_format::CompiledModule;
 use move_symbol_pool::Symbol;
 use move_core_types::{
-    ident_str, 
-    account_address::AccountAddress, 
+    ident_str,
+    account_address::AccountAddress,
     language_storage::{TypeTag, StructTag}};
 
 use sui_types::Identifier;
@@ -24,7 +24,7 @@ use sui_ctf_framework::NumericalAddress;
 use sui_transactional_test_runner::{args::SuiValue, test_adapter::FakeID};
 
 async fn handle_client(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
-    
+
     // Initialize SuiTestAdapter
     let modules = vec!["router", "OtterLoan", "OtterSwap", "ctf", "osec", "merch_store"];
     let sources = vec!["router", "otterloan", "otterswap", "ctf", "osec", "merchstore"];
@@ -34,7 +34,7 @@ async fn handle_client(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
         (
             "challenge".to_string(),
             NumericalAddress::parse_str(
-                "0x0", 
+                "0x0",
             )?,
         ),
         (
@@ -71,18 +71,32 @@ async fn handle_client(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
         let src_path = format!("./chall/build/challenge/source_maps/{}.mvsm", module);
         let mod_bytes: Vec<u8> = std::fs::read(mod_path)?;
 
-        let module : CompiledModule = CompiledModule::deserialize_with_defaults(&mod_bytes).unwrap();
+        ////let module : CompiledModule = CompiledModule::deserialize_with_defaults(&mod_bytes).unwrap();
+        let module: CompiledModule = match CompiledModule::deserialize_with_defaults(&mod_bytes) {
+            Ok(m) => m,
+            Err(e) => {
+                let _ = adapter.cleanup_resources().await;
+                return Err("error during compile module".into())
+            }
+        };
         let named_addr_opt: Option<Symbol> = Some(Symbol::from("challenge"));
-        let source_map : Option<SourceMap> = Some(source_map_from_file(Path::new(&src_path)).unwrap());
-        
+        ////let source_map : Option<SourceMap> = Some(source_map_from_file(Path::new(&src_path)).unwrap());
+        let source_map: Option<SourceMap> = match source_map_from_file(Path::new(&src_path)) {
+            Ok(sm) => Some(sm),
+            Err(e) => {
+                let _ = adapter.cleanup_resources().await;
+                return Err("error during source_map".into())
+            }
+        };
+
         let maybe_ncm = MaybeNamedCompiledModule {
             named_address: named_addr_opt,
             module: module,
             source_map: source_map,
         };
-        
+
         mncp_modules.push( maybe_ncm );
-          
+
     }
 
     // Publish Challenge Module
@@ -94,7 +108,7 @@ async fn handle_client(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
         Some(String::from("challenger")),
     ).await.unwrap();
     deployed_modules.push(chall_addr);
-    println!("[SERVER] Module published at: {:?}", chall_addr); 
+    println!("[SERVER] Module published at: {:?}", chall_addr);
 
     let mut solution_data = [0 as u8; 2000];
     let _solution_size = stream.read(&mut solution_data)?;
@@ -109,22 +123,30 @@ async fn handle_client(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
         ),
     )
     .unwrap();
-    stream.write(output.as_bytes()).unwrap();
+    stream.write(output.as_bytes());
 
     // Publish Solution Module
     let mut sol_dependencies: Vec<String> = Vec::new();
     sol_dependencies.push(String::from("challenge"));
 
     let mut mncp_solution : Vec<MaybeNamedCompiledModule> = Vec::new();
-    let module : CompiledModule = CompiledModule::deserialize_with_defaults(&solution_data.to_vec()).unwrap();
+    //////let module : CompiledModule = CompiledModule::deserialize_with_defaults(&solution_data.to_vec())?;/////
+    let module : CompiledModule = match CompiledModule::deserialize_with_defaults(&solution_data.to_vec()) {
+        Ok(m) => m,
+        Err(e) => {
+            let _ = adapter.cleanup_resources().await;
+            return Err("error during compile module".into())
+        }
+    };
+
     let named_addr_opt: Option<Symbol> = Some(Symbol::from("solution"));
     let source_map : Option<SourceMap> = None;
-    
+
     let maybe_ncm = MaybeNamedCompiledModule {
         named_address: named_addr_opt,
         module: module,
         source_map: source_map,
-    }; 
+    };
     mncp_solution.push( maybe_ncm );
 
     let sol_addr = sui_ctf_framework::publish_compiled_module(
@@ -145,11 +167,11 @@ async fn handle_client(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
         ),
     )
     .unwrap();
-    stream.write(output.as_bytes()).unwrap();
+    stream.write(output.as_bytes());
 
     // Prepare Function Call Arguments
     let mut args_liq: Vec<SuiValue> = Vec::new();
-    let arg_liq1 = SuiValue::Object(FakeID::Enumerated(2, 1), None); 
+    let arg_liq1 = SuiValue::Object(FakeID::Enumerated(2, 1), None);
     let arg_liq2 = SuiValue::Object(FakeID::Enumerated(2, 5), None);
     let arg_liq3 = SuiValue::Object(FakeID::Enumerated(2, 6), None);
     args_liq.push(arg_liq1);
@@ -170,7 +192,7 @@ async fn handle_client(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
         type_params: Vec::new(),
     }));
     type_args.push(type1);
-    type_args.push(type2); 
+    type_args.push(type2);
 
     // Call Add Liquidity Function
     let ret_val = sui_ctf_framework::call_function(
@@ -187,8 +209,8 @@ async fn handle_client(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
 
     // Prepare Function Call Arguments
     let mut args_sol: Vec<SuiValue> = Vec::new();
-    let arg_ob1 = SuiValue::Object(FakeID::Enumerated(2, 1), None); 
-    let arg_ob2 = SuiValue::Object(FakeID::Enumerated(2, 2), None); 
+    let arg_ob1 = SuiValue::Object(FakeID::Enumerated(2, 1), None);
+    let arg_ob2 = SuiValue::Object(FakeID::Enumerated(2, 2), None);
     args_sol.push(arg_ob1);
     args_sol.push(arg_ob2);
 
@@ -206,10 +228,10 @@ async fn handle_client(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
         type_params: Vec::new(),
     }));
     type_args_sol.push(sol_type1);
-    type_args_sol.push(sol_type2); 
+    type_args_sol.push(sol_type2);
 
     // Call solve Function
-    let ret_val = sui_ctf_framework::call_function(
+    let ret_val = match sui_ctf_framework::call_function(
         &mut adapter,
         sol_addr,
         "gringotts_solution",
@@ -217,7 +239,14 @@ async fn handle_client(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
         args_sol,
         type_args_sol,
         Some("solver".to_string()),
-    ).await;
+    ).await {
+        Ok(output) => output,
+        Err(e) => {
+            let _ = adapter.cleanup_resources().await;
+            return Err("error during call solve".into())
+        }
+    };
+
     println!("[SERVER] Return value {:#?}", ret_val);
     println!("");
 
@@ -247,15 +276,15 @@ async fn handle_client(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
             println!("");
             if let Ok(flag) = env::var("FLAG") {
                 let message = format!("[SERVER] Congrats, flag: {}", flag);
-                stream.write(message.as_bytes()).unwrap();
+                stream.write(message.as_bytes());
             } else {
-                stream.write("[SERVER] Flag not found, please contact admin".as_bytes()).unwrap();
+                stream.write("[SERVER] Flag not found, please contact admin".as_bytes());
             }
         }
         Err(_error) => {
             println!("[SERVER] Invalid Solution!");
             println!("");
-            stream.write("[SERVER] Invalid Solution!".as_bytes()).unwrap();
+            stream.write("[SERVER] Invalid Solution!".as_bytes());
         }
     };
     adapter.cleanup_resources().await; ///// cleanup,every time
